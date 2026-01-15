@@ -214,39 +214,6 @@ Promise.resolve().then(spam)
 
 ---
 
-## 🧭 Future Test Template
-
-> Copy-paste this section for every new test.
-
-```md
-## 🧪 Test X — <Test Name>
-
-**Session ID:** YYYY-MM-DD-HX  
-**Environment:** Android / WebView  
-**RUN Reset Verified:** Yes / No
-
-### Scope
-- 
-
-### Results
-
-| Subtest | Pass/Fail | Notes |
-|----|----|----|
-
-### Critical Findings
-- 
-
-### Root Cause
-- 
-
-### Severity
-🟢 Low / 🟡 Medium / 🔥 High / 🚨 Critical
-
-### Recommended Fix
-- 
-```
-
----
 
 ## 🧑‍💻 Developer Rules (Read This)
 
