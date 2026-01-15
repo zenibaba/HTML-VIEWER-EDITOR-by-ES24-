@@ -1,314 +1,279 @@
-# HTML Preview App
+# HTML Preview App — Security & Stability Report
 
-> ⚠️ **Status: Alpha / Experimental**  
-> ❌ **Not production-safe**  
-> ✅ **Technically promising with clear remediation path**
-
-This project is an **HTML + CSS + JavaScript preview engine** designed for Android environments.  
-It allows users to execute arbitrary frontend code and view live output.
-
-This repository documents **what works, what breaks, why it breaks, and how to fix it properly**.
+> 🔴 **Status: ALPHA — NOT PRODUCTION READY**  
+> 🟡 **Security: Strong Native Isolation, Weak Runtime Lifecycle**  
+> 🟢 **No Native / Android Bridge Exploits Detected**
 
 ---
 
-## 📌 Table of Contents
+## 🚦 Test Navigation Index (Always Start Here)
 
-- Overview
-- Features
-- Testing Methodology
-- Final Test Results
-- Critical Bugs
-- Architecture Analysis
-- Safe Execution Architecture (Proposed)
-- Known Issues
-- Developer Tips (Per Bug)
-- Roadmap
-- Contributing
-- Disclaimer
+| Test | Name | Status | Jump |
+|----|----|----|----|
+| Test 1 | Core Runtime & UI | ❌ Partial | [Go](#-test-1--core-runtime--ui) |
+| Test 2 | Lifecycle & Control | ❌ Fail | [Go](#-test-2--lifecycle--control) |
+| Test 3 | Real-World Hostility | ❌ Fail | [Go](#-test-3--real-world-hostility) |
+| Test 4 | Advanced Sandbox Hardening | ❌ Fail | [Go](#-test-4--advanced-sandbox-hardening) |
+| Future | Test 5+ | ⏳ Planned | [Go](#-future-test-template) |
+
+> ⚠️ Rule: **If Test 2 lifecycle isolation fails, all later tests are informational only.**
 
 ---
 
-## 🧠 Overview
+## 🧠 Project Overview
 
-The preview engine supports:
-- Live HTML rendering
-- JavaScript execution
-- localStorage
-- Canvas & animations
-- Fetch API
-- WebAudio
-- Console logging
-- Android WebView environment
+This app is an **HTML + CSS + JavaScript preview engine** running in an **Android WebView environment**.
 
-The engine was subjected to **three phases of adversarial testing**, including hostile real-world abuse.
+It allows execution of arbitrary frontend code for testing and preview purposes.
 
-The goal was **truth**, not demo success.
+This document records:
+- What works
+- What fails
+- Why it fails
+- How to fix it safely
+
+No hype. Only evidence.
 
 ---
 
-## ✨ Features (Current)
+## ✨ What Works Well (Summary)
 
-- Real DOM rendering
-- JavaScript execution
-- Canvas animation support
-- Fetch API support
-- localStorage with quota enforcement
-- Error surfacing with stack traces
-- Console logging with throttling
-- Visibility lifecycle awareness
+- No Android JS bridge exposure
+- No native code execution
+- No shell / OS abuse
+- Proper storage quota enforcement
 - History sandboxing
+- Visibility lifecycle events
+- Error surfacing
+
+These are **hard security wins**.
 
 ---
 
-## 🧪 Testing Methodology
+## ❌ What Is Broken (Summary)
 
-### Phase 1 – Core Capability
-- DOM manipulation
-- localStorage persistence
-- Canvas animation
-- Fetch API
-- WebAudio
-- Error handling
+- JS execution context persists across RUN
+- Timers, Promises, Workers survive reload
+- Microtask starvation crashes app
+- window.open allowed
+- Workers run in background
+- Console hooks persist
 
-### Phase 2 – Control & Lifecycle
-- Timer storms
-- Async request storms
-- Resize spam
-- Permission sandboxing
-- Reload cleanup
-
-### Phase 3 – Real-World Hostility
-- Microtask starvation
-- Render starvation
-- Storage quota exhaustion
-- History abuse
-- Visibility lifecycle abuse
-
-All tests were executed on **Android (WebView-based runtime)**.
+These are **architectural flaws**, not syntax bugs.
 
 ---
 
-## 📊 Final Test Results Summary
+## 🧪 Test 1 — Core Runtime & UI
 
-| Area | Result |
-|----|----|
-| Rendering | ✅ Pass |
-| JS Execution | ✅ Pass |
-| Error Reporting | ✅ Pass |
-| Storage Quotas | ✅ Pass |
-| History Isolation | ✅ Pass |
-| Visibility Lifecycle | ✅ Pass |
-| RAF Starvation | ✅ Pass |
-| Timer Cleanup | ❌ Fail |
-| Async Cleanup | ❌ Fail |
-| Reload Isolation | ❌ Fail |
-| CPU Freeze Protection | ❌ Fail |
-| Microtask Control | ❌ **Critical Fail** |
+### Scope
+- DOM rendering
+- JS execution
+- localStorage
+- Canvas
+- Fetch
+- Audio
+- Console
 
----
+### Result
+🟡 **PARTIAL PASS**
 
-## 🚨 Critical Bugs (Production Blockers)
+### Key Findings
+- Rendering works
+- JS executes
+- Storage works
+- Canvas & audio work
+- Console logs visible
 
-### ❌ Bug 1: No Execution Isolation (CRITICAL)
-
-**Reproduction**
+### Critical Failure
 ```js
 while (true) {}
 ```
+➡ freezes entire app
 
-**Observed**
-- Entire app freezes
-- Editor becomes unresponsive
-- No recovery without force close
-
-**Root Cause**
-- Preview JS runs in the same execution context as UI
-
-**Severity**
-🚨 Critical
-
-**Developer Tip**
-> Never run untrusted JavaScript in the same thread or process as your UI.
+### Root Cause
+JS runs on same execution context as UI.
 
 ---
 
-### ❌ Bug 2: Microtask Starvation Crash (CRITICAL)
+## 🧪 Test 2 — Lifecycle & Control
 
-**Reproduction**
-```js
-function spam() {
-  Promise.resolve().then(spam);
-}
-spam();
-```
+### Scope
+- RUN reset
+- Timer storms
+- Async storms
+- Cleanup verification
 
-**Observed**
-- App crashes
-- Android kills process
-- Reload impossible
+### Result
+❌ **FAIL**
 
-**Why This Is Dangerous**
-- Microtasks execute before rendering, timers, and input
-- They bypass naïve watchdogs
-
-**Severity**
-🚨 Critical
-
-**Developer Tip**
-> Microtasks are invisible denial-of-service attacks if not isolated.
-
----
-
-### ❌ Bug 3: Timer & Async Leaks Across RUN
-
-**Reproduction**
-1. Run timer storm
-2. Press RUN again
-3. App becomes sluggish permanently
-
-**Observed**
-- Timers survive reload
+### Evidence
+- Timers persist after RUN
 - Async requests persist
-- Event loop congestion
+- App slows permanently
 
-**Root Cause**
-- JS context reused
-- No cleanup lifecycle
-
-**Severity**
-🔥 High
-
-**Developer Tip**
-> Reload must mean “destroy everything”, not “try again”.
+### Root Cause
+Execution context is reused instead of destroyed.
 
 ---
 
-## 🏗 Architecture Analysis (Current)
+## 🧪 Test 3 — Real-World Hostility
 
-### Current Model
+### Scope
+- Microtask flood
+- RAF starvation
+- Storage bomb
+- History abuse
+- Visibility lifecycle
+
+### Results
+
+| Subtest | Result |
+|----|----|
+| Microtask flood | ❌ App crash |
+| RAF starvation | ✅ Pass |
+| Storage quota | ✅ Pass |
+| History abuse | ✅ Pass |
+| Visibility lifecycle | ✅ Pass |
+
+### Critical Finding
+```js
+Promise.resolve().then(spam)
 ```
-Editor UI
-   ↓
-Shared JS Runtime
-   ↓
-Preview Execution
-```
+➡ hard crash
 
-### Problems
-- No sandbox
-- No lifecycle control
-- No kill switch
-- No memory or CPU limits
-
-This architecture is **unsafe by design** for arbitrary code execution.
+### Severity
+🚨 **CRITICAL**
 
 ---
 
-## 🛡 Proposed Safe Execution Architecture
+## 🧪 Test 4 — Advanced Sandbox Hardening
 
-### Minimum Acceptable Architecture (Android)
+### Scope
+- Navigation
+- window.open
+- Dangerous URL schemes
+- Web Workers
+- Console/Error hooks
 
-```
-Editor UI (Process A)
-   ↓ IPC
-Preview WebView (Process B)
-   ↓
-Destroyed & recreated on every RUN
-```
+### Results
 
-### Key Principles
-
-- **Hard isolation** between editor and preview
-- **Destroy execution context on RUN**
-- **Kill switch** for runaway code
-- **AbortController** for fetch cleanup
-- **Timer registry** for forced cleanup
-
-### Optional Enhancements
-- Watchdog timer
-- Memory usage monitoring
-- Execution timeout
-- Worker-based partial offloading
-
----
-
-## 🐞 Known Issues
-
-| Issue | Severity | Status |
+| Area | Result | Severity |
 |----|----|----|
-| CPU freeze kills app | Critical | Open |
-| Microtask starvation crash | Critical | Open |
-| Timer leak across RUN | High | Open |
-| Async request leak | High | Open |
-| Partial reload inconsistencies | Medium | Open |
+| Navigation | PASS | ✅ |
+| window.open | FAIL | 🟡 |
+| Dangerous schemes | SOFT FAIL | 🟡 |
+| Worker lifecycle | FAIL | 🔥 |
+| Console hooks | FAIL | 🔥 |
 
 ---
 
-## 🧑‍💻 Developer Tips (Read This Carefully)
+### 🔴 Key Test-4 Failures Explained
 
-- **Never trust reload** unless the JS world is destroyed
-- **Never assume Promises are safe**
-- **Never allow unbounded timers**
-- **Never share UI thread with untrusted JS**
-- **Always assume hostile input**
+#### Web Worker Persistence
+- Workers survive RUN
+- Multiple workers accumulate
+- Background CPU usage possible
 
-If isolation is missing, no amount of JS patching will save you.
+#### Console / Error Hook Persistence
+- User JS can hide logs/errors
+- Hooks persist across runs
 
----
-
-## 🛣 Roadmap
-
-### Phase 1 – Safety (Mandatory)
-- Execution isolation
-- Hard reload semantics
-- Emergency STOP / KILL
-
-### Phase 2 – Control
-- Timer & async cleanup
-- Memory caps
-- Execution watchdog
-
-### Phase 3 – DX Improvements
-- Multi-file virtual filesystem
-- Permission toggles
-- Export / share runnable previews
+#### window.open
+- Allowed
+- Does not escape app
+- Should be blocked for hardening
 
 ---
 
-## 🤝 Contributing
+## 🔐 Security Verdict
 
-This project welcomes contributors who understand:
-- security
-- runtime isolation
-- WebView internals
-- JavaScript execution models
+### ✅ What You Are SAFE From
+- Native Android API abuse
+- Shell execution
+- File system access
+- Intent abuse
+- OS-level exploits
 
-### Guidelines
-- Do not add features before fixing isolation
-- All changes must include stress tests
-- No UI-only PRs without runtime safety fixes
-- Document failures honestly
+### ❌ What You Are NOT SAFE From
+- Runaway JS
+- Persistent background execution
+- Denial of service
+- Stealth logic via workers
+
+> **The app is not hackable — but it is abusable.**
 
 ---
 
-## ⚠️ Disclaimer
+## 🛠 Required Fixes (Priority Order)
 
-This app **executes arbitrary code**.
+1. **Destroy execution context on RUN**
+2. Kill all timers, workers, promises
+3. Block or intercept `window.open`
+4. Filter dangerous URL schemes at navigation
+5. Reset console & error hooks
 
-Until execution isolation is implemented:
-- Do NOT expose to untrusted users
-- Do NOT publish as production-ready
+---
+
+## 🧭 Future Test Template
+
+> Copy-paste this section for every new test.
+
+```md
+## 🧪 Test X — <Test Name>
+
+**Session ID:** YYYY-MM-DD-HX  
+**Environment:** Android / WebView  
+**RUN Reset Verified:** Yes / No
+
+### Scope
+- 
+
+### Results
+
+| Subtest | Pass/Fail | Notes |
+|----|----|----|
+
+### Critical Findings
+- 
+
+### Root Cause
+- 
+
+### Severity
+🟢 Low / 🟡 Medium / 🔥 High / 🚨 Critical
+
+### Recommended Fix
+- 
+```
+
+---
+
+## 🧑‍💻 Developer Rules (Read This)
+
+- Never trust reload unless JS world is destroyed
+- Never rely on blocking eval for security
+- Never allow untracked workers
+- Never expose Android JS bridges
+- Always assume hostile input
+
+---
+
+## ⚠️ Final Disclaimer
+
+This app executes **untrusted code**.
+
+Until lifecycle isolation is fixed:
+- Do NOT release publicly
 - Do NOT claim sandbox safety
+- Do NOT allow untrusted users
 
 ---
 
-## 📌 Final Statement
+## 🏁 Final Statement
 
-This project is **not broken** — it is **unfinished**.
+This project failed tests **honestly**, which is rare.
 
-Most tools fail because developers stop testing too early.  
-This one didn’t.
+> Security is not about preventing hacks.  
+> It’s about surviving misuse.
 
-> Truth before polish. Safety before features.
-
-— End of Documentation —
+— End of README —
